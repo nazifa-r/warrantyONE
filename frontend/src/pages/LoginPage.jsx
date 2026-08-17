@@ -14,7 +14,7 @@ const ROLES = [
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const [role, setRole] = useState("user");
+  const [role, setRole] = useState("customer");
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
   const [keepSignedIn, setKeepSignedIn] = useState(false);
@@ -27,6 +27,13 @@ export default function LoginPage() {
     // Wire this up to your auth endpoint — role, email, and password are
     // already in scope here.
     console.log("Sign in", { role, ...form, keepSignedIn });
+
+    if (role === "customer") {
+      navigate("/dashboard/customer");
+    }
+    // TODO: add redirects for retailer / technician / admin once those
+    // dashboards exist, e.g.:
+    // else if (role === "retailer") navigate("/dashboard/retailer");
   };
 
   return (

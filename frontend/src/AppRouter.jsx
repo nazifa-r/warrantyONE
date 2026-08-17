@@ -4,18 +4,14 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import CustomerDashboardPage from "./pages/customer/CustomerDashboardPage";
+import MyProductsPage from "./pages/customer/MyProductsPage";
+import ProductDetailPage from "./pages/customer/ProductDetailPage";
+import RegisterProductPage from "./pages/customer/RegisterProductPage";
+import EditProductPage from "./pages/customer/EditProductPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import NotFoundPage from "./pages/NotFoundPage";
 
-/**
- * Central route map. Add a new <Route> here for every page you build,
- * and drop the real page file into src/pages/.
- *
- * To turn a placeholder into a real page:
- *  1. Create src/pages/PricingPage.jsx (or whatever it is)
- *  2. Import it above
- *  3. Swap the <PlaceholderPage .../> below for <PricingPage />
- */
 export default function AppRouter() {
   return (
     <BrowserRouter>
@@ -78,6 +74,12 @@ export default function AppRouter() {
             />
           }
         />
+
+        <Route path="/dashboard/customer" element={<CustomerDashboardPage />} />
+        <Route path="/dashboard/customer/products" element={<MyProductsPage />} />
+        <Route path="/dashboard/customer/products/:serial" element={<ProductDetailPage />} />
+        <Route path="/dashboard/customer/products/register" element={<RegisterProductPage />} />
+        <Route path="/dashboard/customer/products/:serial/edit" element={<EditProductPage />} />
 
         {/* Catch-all — keep this last */}
         <Route path="*" element={<NotFoundPage />} />

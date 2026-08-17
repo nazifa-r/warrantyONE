@@ -14,7 +14,7 @@ const ROLES = [
 
 export default function RegisterPage() {
   const navigate = useNavigate();
-  const [role, setRole] = useState("user");
+  const [role, setRole] = useState("customer");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreed, setAgreed] = useState(false);
@@ -43,6 +43,13 @@ export default function RegisterPage() {
     // Wire this up to your auth endpoint — role and form fields are
     // already in scope here.
     console.log("Register", { role, ...form });
+
+    if (role === "customer") {
+      navigate("/dashboard/customer");
+    }
+    // TODO: add redirects for retailer / technician / admin once those
+    // dashboards exist, e.g.:
+    // else if (role === "retailer") navigate("/dashboard/retailer");
   };
 
   return (
