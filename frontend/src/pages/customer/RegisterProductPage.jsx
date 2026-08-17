@@ -1,13 +1,65 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import Input from "../../components/ui/Input";
 import DashboardHeader from "../../components/customer/DashboardHeader";
+import { productAPI } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
 
-const CATEGORIES = ["Laptop", "Phone", "Tablet", "TV", "Appliance", "Other"];
-const BRANDS = ["Aurea", "Nordic", "PixelPoint", "Voltbox", "Other"];
+function Select({ label, id, options, value, onChange, required, placeholder = "Select an option" }) {
+  const safeOptions = Array.isArray(options) ? options : [];
+  
+  return (
+    <div>
+      <label
+        htmlFor={id}
+        className="block text-sm font-semibold text-neutral-900 mb-2"
+      >
+        {label}
+      </label>
+      <div className="relative">
+        <select
+          id={id}
+          value={value || ""}
+          onChange={onChange}
+          required={required}
+          className="w-full appearance-none bg-white border-2 border-neutral-900 rounded-md px-4 py-2.5 pr-10 text-sm text-neutral-900 transition-shadow duration-150 focus:outline-none focus:shadow-[3px_3px_0_0_#111827] cursor-pointer"
+        >
+          <option value="">{placeholder}</option>
+          {safeOptions.length > 0 ? (
+            safeOptions.map((opt) => (
+              <option 
+                key={opt.id || opt.brand_id || opt.category_id || Math.random()} 
+                value={opt.id || opt.brand_id || opt.category_id || opt}
+              >
+                {opt.name || opt.brand_name || opt.category_name || opt}
+              </option>
+            ))
+          ) : (
+            <option value="" disabled>No options available</option>
+          )}
+        </select>
+        <svg
+          className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2"
+          width="12"
+          height="8"
+          viewBox="0 0 12 8"
+          fill="none"
+        >
+          <path
+            d="M1 1.5L6 6.5L11 1.5"
+            stroke="#111827"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+    </div>
+  );
+}
 
 const PLANS = [
   {
@@ -30,75 +82,144 @@ const PLANS = [
   },
 ];
 
-function Select({ label, id, options, value, onChange, required }) {
-  return (
-    <div>
-      <label
-        htmlFor={id}
-        className="block text-sm font-semibold text-neutral-900 mb-2"
-      >
-        {label}
-      </label>
-      <div className="relative">
-        <select
-          id={id}
-          value={value}
-          onChange={onChange}
-          required={required}
-          className="w-full appearance-none bg-white border-2 border-neutral-900 rounded-md px-4 py-2.5 pr-10 text-sm text-neutral-900 transition-shadow duration-150 focus:outline-none focus:shadow-[3px_3px_0_0_#111827] cursor-pointer"
-        >
-          {options.map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
-            </option>
-          ))}
-        </select>
-        <svg
-          className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2"
-          width="12"
-          height="8"
-          viewBox="0 0 12 8"
-          fill="none"
-        >
-          <path
-            d="M1 1.5L6 6.5L11 1.5"
-            stroke="#111827"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </div>
-    </div>
-  );
-}
-
 export default function RegisterProductPage() {
   const navigate = useNavigate();
-  // TODO: replace with real authenticated user data
-  const user = { firstName: "Ayan", lastName: "Rahman" };
-  const initials = `${user.firstName[0]}${user.lastName[0]}`;
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [brands, setBrands] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
+
+  const initials = user?.full_name 
+    ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : "U";
 
   const [form, setForm] = useState({
-    productName: "",
-    category: CATEGORIES[0],
-    brand: BRANDS[0],
-    modelNumber: "",
-    serialNumber: "",
-    purchaseDate: "",
-    purchasePrice: "",
-    purchasedFrom: "",
+    product_name: "",
+    category_id: "",
+    brand_id: "",
+    model_number: "",
+    serial_number: "",
+    purchase_date: "",
+    purchase_price: "",
+    customer_id: "",
   });
   const [plan, setPlan] = useState("standard");
 
-  const handleChange = (field) => (e) =>
-    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  // Fetch brands and categories on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoadingData(true);
+        
+        // Fetch brands
+        const brandsRes = await productAPI.getBrands();
+        console.log("Brands response:", brandsRes);
+        console.log("Brands data:", brandsRes.data);
+        
+        let brandsData = [];
+        if (brandsRes.data && brandsRes.data.success) {
+          brandsData = brandsRes.data.data || [];
+        } else if (brandsRes.data && Array.isArray(brandsRes.data)) {
+          brandsData = brandsRes.data;
+        } else if (brandsRes.data && brandsRes.data.brands) {
+          brandsData = brandsRes.data.brands;
+        } else if (Array.isArray(brandsRes)) {
+          brandsData = brandsRes;
+        } else {
+          brandsData = [];
+        }
+        
+        console.log("Processed brands:", brandsData);
+        setBrands(brandsData);
+        
+        // Fetch categories
+        const categoriesRes = await productAPI.getCategories();
+        console.log("Categories response:", categoriesRes);
+        console.log("Categories data:", categoriesRes.data);
+        
+        let categoriesData = [];
+        if (categoriesRes.data && categoriesRes.data.success) {
+          categoriesData = categoriesRes.data.data || [];
+        } else if (categoriesRes.data && Array.isArray(categoriesRes.data)) {
+          categoriesData = categoriesRes.data;
+        } else if (categoriesRes.data && categoriesRes.data.categories) {
+          categoriesData = categoriesRes.data.categories;
+        } else if (Array.isArray(categoriesRes)) {
+          categoriesData = categoriesRes;
+        } else {
+          categoriesData = [];
+        }
+        
+        console.log("Processed categories:", categoriesData);
+        setCategories(categoriesData);
+        
+      } catch (err) {
+        console.error("Error fetching dropdown data:", err);
+        setError("Failed to load brands and categories. Please refresh the page.");
+      } finally {
+        setLoadingData(false);
+      }
+    };
+    fetchData();
+  }, []);
 
-  const handleSubmit = (e) => {
+  // Set customer_id from user
+  useEffect(() => {
+    if (user?.customer_id) {
+      setForm(prev => ({ ...prev, customer_id: user.customer_id }));
+    }
+  }, [user]);
+
+  const handleChange = (field) => (e) => {
+    setError("");
+    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // TODO: wire up to your API — form fields and `plan` are in scope here.
-    console.log("Register product", { ...form, plan });
-    navigate("/dashboard/customer/products");
+    setLoading(true);
+    setError("");
+    setSuccess("");
+
+    // Validate required fields
+    if (!form.customer_id) {
+      setError("Customer information is missing. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    if (!form.brand_id) {
+      setError("Please select a brand.");
+      setLoading(false);
+      return;
+    }
+
+    if (!form.category_id) {
+      setError("Please select a category.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await productAPI.create(form);
+      
+      if (response.data.success) {
+        setSuccess("Product registered successfully!");
+        setTimeout(() => {
+          navigate("/dashboard/customer/products");
+        }, 1500);
+      } else {
+        setError(response.data.message || "Failed to register product");
+      }
+    } catch (err) {
+      console.error("Error registering product:", err);
+      setError(err.response?.data?.message || "Failed to register product. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -149,6 +270,18 @@ export default function RegisterProductPage() {
           paper card needed.
         </p>
 
+        {/* Error/Success messages */}
+        {error && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+            <p className="text-sm text-red-600 font-medium">{error}</p>
+          </div>
+        )}
+        {success && (
+          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+            <p className="text-sm text-green-600 font-medium">{success}</p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="mt-8 space-y-6">
           {/* Product details */}
           <Card className="hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[7px_7px_0_0_#111827]">
@@ -162,72 +295,69 @@ export default function RegisterProductPage() {
 
             <div className="grid sm:grid-cols-2 gap-5">
               <Input
-                id="productName"
+                id="product_name"
                 label="Product name"
                 placeholder="e.g. Aurea A14 Laptop"
                 required
-                value={form.productName}
-                onChange={handleChange("productName")}
+                value={form.product_name}
+                onChange={handleChange("product_name")}
               />
+              
               <Select
-                id="category"
+                id="category_id"
                 label="Category"
-                options={CATEGORIES}
-                value={form.category}
-                onChange={handleChange("category")}
+                options={categories}
+                value={form.category_id}
+                onChange={handleChange("category_id")}
                 required
+                placeholder={loadingData ? "Loading categories..." : "Select a category"}
               />
 
               <Select
-                id="brand"
+                id="brand_id"
                 label="Brand"
-                options={BRANDS}
-                value={form.brand}
-                onChange={handleChange("brand")}
+                options={brands}
+                value={form.brand_id}
+                onChange={handleChange("brand_id")}
                 required
+                placeholder={loadingData ? "Loading brands..." : "Select a brand"}
               />
+              
               <Input
-                id="modelNumber"
+                id="model_number"
                 label="Model number"
                 placeholder="e.g. A14-2026"
                 required
-                value={form.modelNumber}
-                onChange={handleChange("modelNumber")}
+                value={form.model_number}
+                onChange={handleChange("model_number")}
               />
 
               <Input
-                id="serialNumber"
+                id="serial_number"
                 label="Serial number"
                 placeholder="e.g. 8842-AX10-7731"
                 required
-                value={form.serialNumber}
-                onChange={handleChange("serialNumber")}
+                value={form.serial_number}
+                onChange={handleChange("serial_number")}
               />
+              
               <Input
-                id="purchaseDate"
+                id="purchase_date"
                 label="Purchase date"
                 type="date"
                 required
-                value={form.purchaseDate}
-                onChange={handleChange("purchaseDate")}
+                value={form.purchase_date}
+                onChange={handleChange("purchase_date")}
               />
 
               <Input
-                id="purchasePrice"
-                label="Purchase price"
+                id="purchase_price"
+                label="Purchase price (in BDT)"
                 type="number"
                 placeholder="e.g. 85000"
                 required
-                value={form.purchasePrice}
-                onChange={handleChange("purchasePrice")}
-              />
-              <Input
-                id="purchasedFrom"
-                label="Purchased from"
-                placeholder="e.g. Aurea Electronics — Gulshan"
-                required
-                value={form.purchasedFrom}
-                onChange={handleChange("purchasedFrom")}
+                value={form.purchase_price}
+                onChange={handleChange("purchase_price")}
               />
             </div>
           </Card>
@@ -299,8 +429,9 @@ export default function RegisterProductPage() {
               type="submit"
               variant="glow"
               className="w-full sm:w-auto"
+              disabled={loading || loadingData}
             >
-              Register product
+              {loading ? "Registering..." : "Register product"}
             </Button>
           </div>
         </form>

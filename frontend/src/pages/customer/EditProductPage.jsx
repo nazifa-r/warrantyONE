@@ -1,51 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import Input from "../../components/ui/Input";
 import DashboardHeader from "../../components/customer/DashboardHeader";
+import { productAPI } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
 
-const CATEGORIES = ["Laptop", "Phone", "Tablet", "TV", "Appliance", "Other"];
-const BRANDS = ["Aurea", "Nordic", "PixelPoint", "Voltbox", "Other"];
-
-// TODO: replace with a real fetch by serial number from your API.
-// Kept in sync manually with ProductDetailPage.jsx for now — once a
-// backend exists, both pages should read from the same source instead
-// of two separate hardcoded objects.
-const PRODUCTS_BY_SERIAL = {
-  "8842-AX10-7731": {
-    productName: "Aurea A14 Laptop",
-    category: "Laptop",
-    brand: "Aurea",
-    modelNumber: "A14-2026",
-    serialNumber: "8842-AX10-7731",
-    purchaseDate: "2026-03-14",
-    purchasePrice: "125000",
-    purchasedFrom: "Aurea Electronics — Gulshan",
-  },
-  "2210-NX5-4402": {
-    productName: "Nordic N5 Phone",
-    category: "Phone",
-    brand: "Nordic",
-    modelNumber: "N5-2025",
-    serialNumber: "2210-NX5-4402",
-    purchaseDate: "2025-09-09",
-    purchasePrice: "45000",
-    purchasedFrom: "Nordic Home — Banani",
-  },
-  "5567-PX2-1190": {
-    productName: "PixelPoint Tablet",
-    category: "Tablet",
-    brand: "PixelPoint",
-    modelNumber: "PX2-2024",
-    serialNumber: "5567-PX2-1190",
-    purchaseDate: "2024-06-18",
-    purchasePrice: "32000",
-    purchasedFrom: "PixelPoint Store — Mirpur",
-  },
-};
-
-function Select({ label, id, options, value, onChange, required }) {
+function Select({ label, id, options, value, onChange, required, placeholder = "Select an option" }) {
   return (
     <div>
       <label
@@ -57,16 +19,21 @@ function Select({ label, id, options, value, onChange, required }) {
       <div className="relative">
         <select
           id={id}
-          value={value}
+          value={value || ""}
           onChange={onChange}
           required={required}
           className="w-full appearance-none bg-white border-2 border-neutral-900 rounded-md px-4 py-2.5 pr-10 text-sm text-neutral-900 transition-shadow duration-150 focus:outline-none focus:shadow-[3px_3px_0_0_#111827] cursor-pointer"
         >
-          {options.map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
-            </option>
-          ))}
+          <option value="">{placeholder}</option>
+          {options && options.length > 0 ? (
+            options.map((opt) => (
+              <option key={opt.id || opt} value={opt.id || opt}>
+                {opt.name || opt}
+              </option>
+            ))
+          ) : (
+            <option value="" disabled>No options available</option>
+          )}
         </select>
         <svg
           className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2"
@@ -117,7 +84,7 @@ function LockedField({ label, value }) {
         </span>
       </label>
       <div className="w-full bg-neutral-100 border-2 border-neutral-300 rounded-md px-4 py-2.5 text-sm text-neutral-500 font-mono cursor-not-allowed select-none">
-        {value}
+        {value || "N/A"}
       </div>
     </div>
   );
@@ -126,37 +93,146 @@ function LockedField({ label, value }) {
 export default function EditProductPage() {
   const { serial } = useParams();
   const navigate = useNavigate();
-  // TODO: replace with real authenticated user data
-  const user = { firstName: "Ayan", lastName: "Rahman" };
-  const initials = `${user.firstName[0]}${user.lastName[0]}`;
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [brands, setBrands] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
+  const [form, setForm] = useState({
+    product_id: "",
+    product_name: "",
+    category_id: "",
+    brand_id: "",
+    model_number: "",
+    serial_number: "",
+    purchase_date: "",
+    purchase_price: "",
+    is_active: true,
+  });
 
-  const existing = PRODUCTS_BY_SERIAL[serial];
-  const [form, setForm] = useState(
-    existing || {
-      productName: "",
-      category: CATEGORIES[0],
-      brand: BRANDS[0],
-      modelNumber: "",
-      serialNumber: serial || "",
-      purchaseDate: "",
-      purchasePrice: "",
-      purchasedFrom: "",
-    }
-  );
+  const initials = user?.full_name 
+    ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : "U";
 
-  const handleChange = (field) => (e) =>
+  // Fetch product data and dropdown options
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setLoadingData(true);
+        
+        // Fetch product details
+        const productRes = await productAPI.getBySerial(serial);
+        console.log("Product response:", productRes.data);
+        
+        // Fetch brands and categories
+        const [brandsRes, categoriesRes] = await Promise.all([
+          productAPI.getBrands(),
+          productAPI.getCategories()
+        ]);
+        
+        console.log("Brands response:", brandsRes.data);
+        console.log("Categories response:", categoriesRes.data);
+        
+        if (productRes.data.success) {
+          const product = productRes.data.data;
+          setForm({
+            product_id: product.product_id || "",
+            product_name: product.product_name || "",
+            category_id: product.category_id || "",
+            brand_id: product.brand_id || "",
+            model_number: product.model_number || "",
+            serial_number: product.serial_number || "",
+            purchase_date: product.purchase_date ? new Date(product.purchase_date).toISOString().split('T')[0] : "",
+            purchase_price: product.purchase_price || "",
+            is_active: product.is_active !== undefined ? product.is_active : true,
+          });
+        } else {
+          setError("Product not found");
+        }
+        
+        if (brandsRes.data.success) {
+          setBrands(brandsRes.data.data || []);
+        } else {
+          const brandsData = brandsRes.data || [];
+          setBrands(Array.isArray(brandsData) ? brandsData : []);
+        }
+        
+        if (categoriesRes.data.success) {
+          setCategories(categoriesRes.data.data || []);
+        } else {
+          const categoriesData = categoriesRes.data || [];
+          setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+        }
+      } catch (err) {
+        console.error("Error fetching data:", err);
+        setError("Failed to load product details");
+      } finally {
+        setLoading(false);
+        setLoadingData(false);
+      }
+    };
+    fetchData();
+  }, [serial]);
+
+  const handleChange = (field) => (e) => {
+    setError("");
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // TODO: wire up to your API — form fields are in scope here.
-    // modelNumber and serialNumber are locked and always
-    // submitted as their original values.
-    console.log("Update product", form);
-    navigate(`/dashboard/customer/products/${form.serialNumber}`);
   };
 
-  if (!existing) {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setUpdating(true);
+    setError("");
+    setSuccess("");
+
+    if (!form.brand_id) {
+      setError("Please select a brand.");
+      setUpdating(false);
+      return;
+    }
+
+    if (!form.category_id) {
+      setError("Please select a category.");
+      setUpdating(false);
+      return;
+    }
+
+    try {
+      const response = await productAPI.update(form.product_id, form);
+      
+      if (response.data.success) {
+        setSuccess("Product updated successfully!");
+        setTimeout(() => {
+          navigate(`/dashboard/customer/products/${form.serial_number}`);
+        }, 1500);
+      } else {
+        setError(response.data.message || "Failed to update product");
+      }
+    } catch (err) {
+      console.error("Error updating product:", err);
+      setError(err.response?.data?.message || "Failed to update product. Please try again.");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F6F4EC] text-neutral-900">
+        <DashboardHeader user={user} initials={initials} />
+        <main className="max-w-3xl mx-auto px-4 sm:px-6 py-16 text-center">
+          <div className="w-12 h-12 border-4 border-neutral-900 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="mt-4 text-neutral-600">Loading product details...</p>
+        </main>
+      </div>
+    );
+  }
+
+  if (error && !loading) {
     return (
       <div className="min-h-screen bg-[#F6F4EC] text-neutral-900">
         <DashboardHeader user={user} initials={initials} />
@@ -214,7 +290,7 @@ export default function EditProductPage() {
             to={`/dashboard/customer/products/${serial}`}
             className="font-semibold text-neutral-900 hover:text-amber-600 transition-colors duration-150"
           >
-            {existing.productName}
+            {form.product_name || "Product"}
           </Link>
           <span className="text-neutral-400 mx-2">/</span>
           <span className="text-neutral-500">Edit</span>
@@ -229,6 +305,18 @@ export default function EditProductPage() {
           warranty coverage.
         </p>
 
+        {/* Error/Success messages */}
+        {error && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+            <p className="text-sm text-red-600 font-medium">{error}</p>
+          </div>
+        )}
+        {success && (
+          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+            <p className="text-sm text-green-600 font-medium">{success}</p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="mt-8 space-y-6">
           <Card className="hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[7px_7px_0_0_#111827]">
             <h2 className="font-semibold text-neutral-900 mb-1">
@@ -242,56 +330,54 @@ export default function EditProductPage() {
 
             <div className="grid sm:grid-cols-2 gap-5">
               <Input
-                id="productName"
+                id="product_name"
                 label="Product name"
                 required
-                value={form.productName}
-                onChange={handleChange("productName")}
+                value={form.product_name}
+                onChange={handleChange("product_name")}
               />
+              
               <Select
-                id="category"
+                id="category_id"
                 label="Category"
-                options={CATEGORIES}
-                value={form.category}
-                onChange={handleChange("category")}
+                options={categories}
+                value={form.category_id}
+                onChange={handleChange("category_id")}
                 required
+                placeholder={loadingData ? "Loading categories..." : "Select a category"}
               />
 
               <Select
-                id="brand"
+                id="brand_id"
                 label="Brand"
-                options={BRANDS}
-                value={form.brand}
-                onChange={handleChange("brand")}
+                options={brands}
+                value={form.brand_id}
+                onChange={handleChange("brand_id")}
                 required
+                placeholder={loadingData ? "Loading brands..." : "Select a brand"}
               />
-              <LockedField label="Model number" value={form.modelNumber} />
+              
+              <LockedField label="Model number" value={form.model_number} />
 
-              <LockedField label="Serial number" value={form.serialNumber} />
+              <LockedField label="Serial number" value={form.serial_number} />
+              
               <Input
-                id="purchaseDate"
+                id="purchase_date"
                 label="Purchase date"
                 type="date"
                 required
-                value={form.purchaseDate}
-                onChange={handleChange("purchaseDate")}
+                value={form.purchase_date}
+                onChange={handleChange("purchase_date")}
               />
 
               <Input
-                id="purchasePrice"
-                label="Purchase price"
+                id="purchase_price"
+                label="Purchase price (in BDT)"
                 type="number"
                 placeholder="e.g. 85000"
                 required
-                value={form.purchasePrice}
-                onChange={handleChange("purchasePrice")}
-              />
-              <Input
-                id="purchasedFrom"
-                label="Purchased from"
-                required
-                value={form.purchasedFrom}
-                onChange={handleChange("purchasedFrom")}
+                value={form.purchase_price}
+                onChange={handleChange("purchase_price")}
               />
             </div>
           </Card>
@@ -310,8 +396,13 @@ export default function EditProductPage() {
                 Cancel
               </Button>
             </Link>
-            <Button type="submit" variant="glow" className="w-full sm:w-auto">
-              Save changes
+            <Button
+              type="submit"
+              variant="glow"
+              className="w-full sm:w-auto"
+              disabled={updating || loadingData}
+            >
+              {updating ? "Saving..." : "Save changes"}
             </Button>
           </div>
         </form>

@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import RoleTabs from "../components/ui/RoleTabs";
+import { useAuth } from "../context/AuthContext";
 
 const ROLES = [
   { value: "customer", label: "Customer" },
@@ -14,33 +15,85 @@ const ROLES = [
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { login, error: authError } = useAuth();
   const [role, setRole] = useState("customer");
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
   const [keepSignedIn, setKeepSignedIn] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  
+  // Refs to clear autofill
+  const emailRef = useRef(null);
+  const passwordRef = useRef(null);
 
-  const handleChange = (field) => (e) =>
-    setForm((prev) => ({ ...prev, [field]: e.target.value }));
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // Wire this up to your auth endpoint — role, email, and password are
-    // already in scope here.
-    console.log("Sign in", { role, ...form, keepSignedIn });
-
-    if (role === "customer") {
-      navigate("/dashboard/customer");
+  // Clear browser autofill on mount
+  useEffect(() => {
+    // Clear any autofilled values
+    if (emailRef.current) {
+      emailRef.current.value = "";
     }
-    // TODO: add redirects for retailer / technician / admin once those
-    // dashboards exist, e.g.:
-    // else if (role === "retailer") navigate("/dashboard/retailer");
+    if (passwordRef.current) {
+      passwordRef.current.value = "";
+    }
+    setForm({ email: "", password: "" });
+  }, []);
+
+  const handleChange = (field) => (e) => {
+    setError("");
+    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Prevent any autofill from interfering
+    const currentEmail = emailRef.current?.value || form.email;
+    const currentPassword = passwordRef.current?.value || form.password;
+    
+    if (!currentEmail || !currentPassword) {
+      setError("Please fill in all fields");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    const result = await login({
+      email: currentEmail,
+      password: currentPassword,
+    });
+
+    if (result.success) {
+      const userRole = result.user?.role?.toLowerCase() || role;
+      if (userRole === "customer") {
+        navigate("/dashboard/customer");
+      } else if (userRole === "retailer") {
+        navigate("/dashboard/retailer");
+      } else if (userRole === "technician") {
+        navigate("/dashboard/technician");
+      } else if (userRole === "admin") {
+        navigate("/dashboard/admin");
+      } else {
+        navigate("/dashboard/customer");
+      }
+    } else {
+      setError(result.error || "Login failed. Please check your credentials.");
+      // Clear password field and ref
+      setForm(prev => ({ ...prev, password: "" }));
+      if (passwordRef.current) {
+        passwordRef.current.value = "";
+      }
+    }
+
+    setLoading(false);
   };
 
   return (
     <div className="min-h-screen grid md:grid-cols-2">
       {/* Left brand panel */}
       <div className="relative hidden md:flex flex-col justify-between bg-neutral-950 text-white px-10 lg:px-14 py-10 overflow-hidden">
-        {/* faint grid pattern */}
         <div
           className="absolute inset-0 opacity-[0.15]"
           style={{
@@ -59,7 +112,7 @@ export default function LoginPage() {
         </Link>
 
         <div className="relative max-w-md">
-          <Badge variant="eyebrow" className="!text-amber-300 block mb-4">
+          <Badge variant="eyebrow" className="text-amber-300! block mb-4">
             Sign in to your account
           </Badge>
           <h1 className="text-3xl lg:text-4xl font-bold leading-tight">
@@ -71,8 +124,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <p className="relative text-xs text-neutral-500">
-        </p>
+        <p className="relative text-xs text-neutral-500"></p>
       </div>
 
       {/* Right form panel */}
@@ -100,7 +152,6 @@ export default function LoginPage() {
             Back
           </button>
 
-          {/* Logo shown only on mobile, since the brand panel is hidden below md */}
           <Link
             to="/"
             className="md:hidden flex items-center gap-2 font-semibold text-neutral-900 mb-10 w-fit"
@@ -116,7 +167,19 @@ export default function LoginPage() {
             Enter your credentials to access your account.
           </p>
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+          {/* Error message display - stays visible until user types */}
+          {(error || authError) && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md animate-shake">
+              <p className="text-sm text-red-600 font-medium">{error || authError}</p>
+            </div>
+          )}
+
+          <form 
+            onSubmit={handleSubmit} 
+            className="mt-8 space-y-6" 
+            autoComplete="off"
+            noValidate
+          >
             <div>
               <span className="block text-sm font-semibold text-neutral-900 mb-2">
                 I am a
@@ -124,36 +187,54 @@ export default function LoginPage() {
               <RoleTabs roles={ROLES} value={role} onChange={setRole} />
             </div>
 
-            <Input
-              id="email"
-              label="Email address"
-              type="email"
-              placeholder="you@example.com"
-              autoComplete="email"
-              required
-              value={form.email}
-              onChange={handleChange("email")}
-            />
+            <div className="space-y-1">
+              <label htmlFor="email" className="block text-sm font-semibold text-neutral-900">
+                Email address
+              </label>
+              <input
+                id="email"
+                ref={emailRef}
+                type="email"
+                placeholder="you@example.com"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck="false"
+                required
+                value={form.email}
+                onChange={handleChange("email")}
+                className="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+              />
+            </div>
 
-            <Input
-              id="password"
-              label="Password"
-              type={showPassword ? "text" : "password"}
-              placeholder="••••••••••"
-              autoComplete="current-password"
-              required
-              value={form.password}
-              onChange={handleChange("password")}
-              trailing={
+            <div className="space-y-1">
+              <label htmlFor="password" className="block text-sm font-semibold text-neutral-900">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  id="password"
+                  ref={passwordRef}
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••••"
+                  autoComplete="new-password"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck="false"
+                  required
+                  value={form.password}
+                  onChange={handleChange("password")}
+                  className="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+                />
                 <button
                   type="button"
                   onClick={() => setShowPassword((s) => !s)}
-                  className="text-xs font-mono uppercase tracking-wide text-neutral-500 hover:text-neutral-900 transition-colors duration-150"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono uppercase tracking-wide text-neutral-500 hover:text-neutral-900 transition-colors duration-150"
                 >
                   {showPassword ? "Hide" : "Show"}
                 </button>
-              }
-            />
+              </div>
+            </div>
 
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2 text-neutral-700 cursor-pointer select-none">
@@ -173,9 +254,13 @@ export default function LoginPage() {
               </Link>
             </div>
 
-            <Button type="submit" variant="glow" className="w-full">
-              Sign in
-            </Button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-neutral-900 text-white py-2 px-4 rounded-md hover:bg-neutral-700 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            >
+              {loading ? "Signing in..." : "Sign in"}
+            </button>
           </form>
 
           <p className="mt-6 text-center text-sm text-neutral-600">

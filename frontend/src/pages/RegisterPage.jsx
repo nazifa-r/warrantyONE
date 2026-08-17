@@ -4,6 +4,7 @@ import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import RoleTabs from "../components/ui/RoleTabs";
+import { useAuth } from "../context/AuthContext";
 
 const ROLES = [
   { value: "customer", label: "Customer" },
@@ -14,10 +15,13 @@ const ROLES = [
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const { register, error: authError } = useAuth();
   const [role, setRole] = useState("customer");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreed, setAgreed] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -27,36 +31,95 @@ export default function RegisterPage() {
     confirmPassword: "",
   });
 
-  const handleChange = (field) => (e) =>
+  const handleChange = (field) => (e) => {
+    setError("");
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (form.password !== form.confirmPassword) {
-      console.warn("Passwords do not match");
-      return;
-    }
-    if (!agreed) {
-      console.warn("Must agree to Terms & Privacy Policy");
-      return;
-    }
-    // Wire this up to your auth endpoint — role and form fields are
-    // already in scope here.
-    console.log("Register", { role, ...form });
+    setLoading(true);
+    setError("");
 
-    if (role === "customer") {
-      navigate("/dashboard/customer");
+    // Validate passwords match
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords do not match");
+      setLoading(false);
+      return;
     }
-    // TODO: add redirects for retailer / technician / admin once those
-    // dashboards exist, e.g.:
-    // else if (role === "retailer") navigate("/dashboard/retailer");
+
+    // Validate password length
+    if (form.password.length < 6) {
+      setError("Password must be at least 6 characters");
+      setLoading(false);
+      return;
+    }
+
+    // Validate terms agreement
+    if (!agreed) {
+      setError("Please agree to the Terms & Privacy Policy");
+      setLoading(false);
+      return;
+    }
+
+    // Validate required fields
+    if (!form.firstName || !form.lastName || !form.email || !form.phone) {
+      setError("Please fill in all required fields");
+      setLoading(false);
+      return;
+    }
+
+    // Map role to match backend
+    const roleMap = {
+      customer: "Customer",
+      retailer: "Retailer",
+      technician: "Technician",
+      admin: "Admin",
+    };
+
+    // Prepare data for backend
+    const userData = {
+      full_name: `${form.firstName} ${form.lastName}`.trim(),
+      email: form.email,
+      password: form.password,
+      phone: form.phone,
+      role: roleMap[role] || "Customer",
+    };
+
+    const result = await register(userData);
+
+    if (result.success) {
+      // Redirect based on role
+      const userRole = result.user?.role?.toLowerCase() || role;
+      if (userRole === "customer") {
+        navigate("/dashboard/customer");
+      } else if (userRole === "retailer") {
+        navigate("/dashboard/retailer");
+      } else if (userRole === "technician") {
+        navigate("/dashboard/technician");
+      } else if (userRole === "admin") {
+        navigate("/dashboard/admin");
+      } else {
+        navigate("/dashboard/customer");
+      }
+    } else {
+      // Display the error message from the backend
+      setError(result.error || "Registration failed. Please try again.");
+      // Clear password fields on error
+      setForm(prev => ({ 
+        ...prev, 
+        password: "", 
+        confirmPassword: "" 
+      }));
+    }
+
+    setLoading(false);
   };
 
   return (
     <div className="min-h-screen grid md:grid-cols-2">
       {/* Left brand panel */}
       <div className="relative hidden md:flex flex-col justify-between bg-neutral-950 text-white px-10 lg:px-14 py-10 overflow-hidden">
-        {/* faint grid pattern */}
         <div
           className="absolute inset-0 opacity-[0.15]"
           style={{
@@ -75,7 +138,7 @@ export default function RegisterPage() {
         </Link>
 
         <div className="relative max-w-md">
-          <Badge variant="eyebrow" className="!text-amber-300 block mb-4">
+          <Badge variant="eyebrow" className="text-amber-300! block mb-4">
             Create your account
           </Badge>
           <h1 className="text-3xl lg:text-4xl font-bold leading-tight">
@@ -88,8 +151,7 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        <p className="relative text-xs text-neutral-500">
-        </p>
+        <p className="relative text-xs text-neutral-500"></p>
       </div>
 
       {/* Right form panel */}
@@ -117,7 +179,6 @@ export default function RegisterPage() {
             Back
           </button>
 
-          {/* Logo shown only on mobile, since the brand panel is hidden below md */}
           <Link
             to="/"
             className="md:hidden flex items-center gap-2 font-semibold text-neutral-900 mb-10 w-fit"
@@ -135,7 +196,14 @@ export default function RegisterPage() {
             Fill in your details to get started.
           </p>
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+          {/* Error message display */}
+          {(error || authError) && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-sm text-red-600">{error || authError}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="mt-8 space-y-6" autoComplete="off">
             <div>
               <span className="block text-sm font-semibold text-neutral-900 mb-2">
                 I am a
@@ -148,7 +216,7 @@ export default function RegisterPage() {
                 id="firstName"
                 label="First name"
                 placeholder="Ayan"
-                autoComplete="given-name"
+                autoComplete="off"
                 required
                 value={form.firstName}
                 onChange={handleChange("firstName")}
@@ -157,7 +225,7 @@ export default function RegisterPage() {
                 id="lastName"
                 label="Last name"
                 placeholder="Rahman"
-                autoComplete="family-name"
+                autoComplete="off"
                 required
                 value={form.lastName}
                 onChange={handleChange("lastName")}
@@ -169,7 +237,7 @@ export default function RegisterPage() {
               label="Email address"
               type="email"
               placeholder="you@example.com"
-              autoComplete="email"
+              autoComplete="off"
               required
               value={form.email}
               onChange={handleChange("email")}
@@ -180,7 +248,7 @@ export default function RegisterPage() {
               label="Phone number"
               type="tel"
               placeholder="+880 1XX XXX XXXX"
-              autoComplete="tel"
+              autoComplete="off"
               required
               value={form.phone}
               onChange={handleChange("phone")}
@@ -250,8 +318,8 @@ export default function RegisterPage() {
               </Link>
             </label>
 
-            <Button type="submit" variant="glow" className="w-full">
-              Create account
+            <Button type="submit" variant="glow" className="w-full" disabled={loading}>
+              {loading ? "Creating account..." : "Create account"}
             </Button>
           </form>
 
