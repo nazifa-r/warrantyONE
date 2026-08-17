@@ -1,23 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/auth');
-const { sendSuccess, sendError } = require('../utils/responseHandler');
+const { 
+    register, 
+    login, 
+    getMe, 
+    logout 
+} = require('../controllers/authController');
 
-// Placeholder routes - we'll implement these later
-router.post('/register', (req, res) => {
-  sendSuccess(res, null, 'Register endpoint - to be implemented');
-});
+// Public routes
+router.post('/register', register);  // POST - Register new user
+router.post('/login', login);        // POST - Login user
 
-router.post('/login', (req, res) => {
-  sendSuccess(res, null, 'Login endpoint - to be implemented');
-});
-
-router.get('/me', protect, (req, res) => {
-  sendSuccess(res, req.user, 'User profile retrieved');
-});
-
-router.post('/logout', (req, res) => {
-  sendSuccess(res, null, 'Logged out successfully');
-});
+// Protected routes
+router.get('/me', protect, getMe);   // GET - Get current user profile
+router.post('/logout', protect, logout); // POST - Logout user
 
 module.exports = router;
