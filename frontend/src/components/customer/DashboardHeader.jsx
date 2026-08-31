@@ -1,13 +1,19 @@
 import React, { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import IconTile from "../ui/IconTile";
+import { useAuth } from "../../context/AuthContext";
+
+const REPAIRS_LINK = { label: "Repairs", to: "/dashboard/customer/repairs" };
 
 const NAV_LINKS = [
   { label: "Dashboard", to: "/dashboard/customer" },
   { label: "My Products", to: "/dashboard/customer/products" },
-  { label: "Repairs", to: "/dashboard/customer/repairs" },
+  REPAIRS_LINK,
   { label: "Payments", to: "/dashboard/customer/payments" },
 ];
+
+const ANALYTICS_LINK = { label: "Analytics", to: "/dashboard/analytics" };
+const ADMIN_LINK = { label: "Admin", to: "/dashboard/admin" };
 
 function LogoutIcon() {
   return (
@@ -32,10 +38,22 @@ function LogoutIcon() {
 export default function DashboardHeader({ user, initials }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const { logout } = useAuth();
+
+  // Analytics is Admin/Retailer only — matches the backend's
+  // authorize('Admin', 'Retailer') guard on /api/analytics/*.
+  const role = user?.role?.toLowerCase();
+  const canSeeAnalytics = role === "admin" || role === "retailer";
+  const isAdmin = role === "admin";
+
+  // Admins get a trimmed-down nav — just Repairs, Analytics, and
+  // Admin — instead of the full customer link set.
+  const navLinks = isAdmin
+    ? [ ADMIN_LINK,ANALYTICS_LINK]
+    : [...NAV_LINKS, ...(canSeeAnalytics ? [ANALYTICS_LINK] : [])];
 
   const handleLogout = () => {
-    // TODO: clear auth token / session here
-    console.log("Logging out");
+    logout();
     navigate("/login");
   };
 
@@ -50,7 +68,7 @@ export default function DashboardHeader({ user, initials }) {
         </Link>
 
         <ul className="hidden md:flex items-center gap-8 text-sm text-neutral-600">
-          {NAV_LINKS.map((link) => (
+          {navLinks.map((link) => (
             <li key={link.label}>
               <NavLink
                 to={link.to}
@@ -69,7 +87,7 @@ export default function DashboardHeader({ user, initials }) {
 
         <div className="flex items-center gap-2 sm:gap-3">
           <span className="hidden sm:inline text-sm text-neutral-700">
-            {user?.firstName} {user?.lastName}
+            {user?.full_name}
           </span>
           <IconTile tone="violet">{initials}</IconTile>
 
@@ -106,7 +124,7 @@ export default function DashboardHeader({ user, initials }) {
       {menuOpen && (
         <div className="md:hidden border-t border-neutral-200 bg-[#F6F4EC] px-4 sm:px-6 py-5">
           <ul className="flex flex-col gap-4 text-sm text-neutral-700">
-            {NAV_LINKS.map((link) => (
+            {navLinks.map((link) => (
               <li key={link.label}>
                 <NavLink
                   to={link.to}

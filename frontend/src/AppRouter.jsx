@@ -10,11 +10,13 @@ import MyProductsPage from "./pages/customer/MyProductsPage";
 import ProductDetailPage from "./pages/customer/ProductDetailPage";
 import RegisterProductPage from "./pages/customer/RegisterProductPage";
 import EditProductPage from "./pages/customer/EditProductPage";
+import MyRepairsPage from "./pages/customer/MyRepairsPage";
+import EditRepairPage from "./pages/customer/EditRepairPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
+import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import NotFoundPage from "./pages/NotFoundPage";
-import MyRepairsPage from "./pages/customer/MyRepairsPage";
 import RequestRepairPage from "./pages/customer/RequestRepairPage";
-import RepairTrackingPage from "./pages/customer/RepairTrackingPage.jsx";
 
 export default function AppRouter() {
   return (
@@ -85,9 +87,14 @@ export default function AppRouter() {
           <Route path="/dashboard/customer/products/:serial" element={<ProductDetailPage />} />
           <Route path="/dashboard/customer/products/register" element={<RegisterProductPage />} />
           <Route path="/dashboard/customer/products/:serial/edit" element={<EditProductPage />} />
-          <Route path="dashboard/customer/repairs" element={<MyRepairsPage/>} />
-          <Route path="/dashboard/customer/repairs/new" element={<RequestRepairPage />} />
-          <Route path="/dashboard/customer/repairs/:repairId" element={<RepairTrackingPage />} />
+          <Route path="/dashboard/customer/repairs" element={<MyRepairsPage />} />
+          <Route
+  path="/dashboard/customer/repairs/new"
+  element={<RequestRepairPage />}
+/>
+          <Route path="/dashboard/customer/repairs/:id/edit" element={<EditRepairPage />} />
+          <Route path="/dashboard/analytics" element={<AnalyticsPage />} />
+          <Route path="/dashboard/admin" element={<AdminDashboardPage />} />
 
           {/* Catch-all — keep this last */}
           <Route path="*" element={<NotFoundPage />} />

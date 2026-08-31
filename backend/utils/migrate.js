@@ -11,7 +11,7 @@ async function migrate() {
     port: process.env.DB_PORT || 3306,
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'warrantyone1_db',
+    database: process.env.DB_NAME || 'warrantyone_db',
     multipleStatements: true,
   });
 

@@ -9,6 +9,7 @@ const productRoutes = require('./routes/productRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const warrantyRoutes = require('./routes/warrantyRoutes');
 const repairRoutes = require('./routes/repairRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 
 const app = express();
@@ -33,6 +34,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/warranties', warrantyRoutes);
 app.use('/api/repairs', repairRoutes);
+app.use('/api/analytics',analyticsRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

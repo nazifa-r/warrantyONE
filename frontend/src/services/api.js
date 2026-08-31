@@ -80,9 +80,35 @@ export const warrantyAPI = {
 
 // Repairs API calls
 export const repairAPI = {
-  getAll: () => API.get('/repairs'),
-  create: (data) => API.post('/repairs', data),
-  updateStatus: (id, status) => API.put(`/repairs/${id}/status`, { status }),
+  // GET /api/repairs
+  getAll: () => API.get("/repairs"),
+
+  // GET /api/repairs/:id
+  getById: (id) => API.get(`/repairs/${id}`),
+
+  // POST /api/repairs
+  create: (data) => API.post("/repairs", data),
+
+  // PUT /api/repairs/:id
+  update: (id, data) => API.put(`/repairs/${id}`, data),
+
+  // PUT /api/repairs/:id/cancel
+  cancel: (id) => API.put(`/repairs/${id}/cancel`),
+
+  // PUT /api/repairs/:id/status
+  updateStatus: (id, status) =>
+    API.put(`/repairs/${id}/status`, { status }),
+};
+// Analytics API calls (Admin/Retailer only)
+export const analyticsAPI = {
+  getProductOwnership: () => API.get('/analytics/product-ownership'),
+  getCustomerProductCounts: () => API.get('/analytics/customer-product-counts'),
+  getAttentionNeeded: () => API.get('/analytics/attention-needed'),
+  getEngagedPremiumCustomers: () => API.get('/analytics/engaged-premium-customers'),
+  getTroubleFreeProducts: () => API.get('/analytics/trouble-free-products'),
+  getCategorySummary: () => API.get('/analytics/category-summary'),
+  getHighValueCustomers: () => API.get('/analytics/high-value-customers'),
+  getAboveAverageProducts: () => API.get('/analytics/above-average-products'),
 };
 
 export default API;

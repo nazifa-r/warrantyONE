@@ -13,6 +13,11 @@ const STATUS_META = {
   In_Progress: { key: "in-progress", label: "In progress",   variant: "warn" },
   Completed:   { key: "completed",   label: "Completed",     variant: "status" },
   Cancelled:   { key: "cancelled",   label: "Cancelled",     variant: "warn" },
+  Accepted: {
+  key: "accepted",
+  label: "Accepted",
+  variant: "status"
+},
 };
 
 const FILTERS = [
@@ -20,6 +25,7 @@ const FILTERS = [
   { value: "pending", label: "Pending" },
   { value: "in-progress", label: "In progress" },
   { value: "completed", label: "Completed" },
+  {value: "accepted", label: "Accepted"}
 ];
 
 const formatDate = (dateString) => {
@@ -31,8 +37,8 @@ const formatDate = (dateString) => {
 const getAction = (repair) => {
   const key = STATUS_META[repair.status]?.key;
   if (key === "pending") return { label: "Edit", to: `/dashboard/customer/repairs/${repair.repair_id}/edit`, secondary: "Cancel" };
-  if (key === "completed") return { label: "View", to: `/dashboard/customer/repairs/${repair.repair_id}` };
-  return { label: "Track", to: `/dashboard/customer/repairs/${repair.repair_id}` };
+  if (key === "completed") return { label: "View", to: `/dashboard/customer/repairs/${repair.repair_id}/edit` };
+  return { label: "Track", to: `/dashboard/customer/repairs/${repair.repair_id}/edit` };
 };
 
 export default function MyRepairsPage() {
@@ -46,26 +52,42 @@ export default function MyRepairsPage() {
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
+  const [cancellingId, setCancellingId] = useState(null);
+
+  const fetchRepairs = async () => {
+    try {
+      setLoading(true);
+      const res = await repairAPI.getAll();
+      if (res.data.success) {
+        setRepairs(res.data.data);
+      } else {
+        setError("Failed to load repairs");
+      }
+    } catch (err) {
+      console.error("Error fetching repairs:", err);
+      setError("Failed to load repairs");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchRepairs = async () => {
-      try {
-        setLoading(true);
-        const res = await repairAPI.getAll();
-        if (res.data.success) {
-          setRepairs(res.data.data);
-        } else {
-          setError("Failed to load repairs");
-        }
-      } catch (err) {
-        console.error("Error fetching repairs:", err);
-        setError("Failed to load repairs");
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchRepairs();
   }, []);
+
+  const handleCancel = async (repairId) => {
+    if (!window.confirm("Cancel this repair request? This can't be undone.")) return;
+    setCancellingId(repairId);
+    try {
+      await repairAPI.cancel(repairId);
+      fetchRepairs();
+    } catch (err) {
+      console.error("Error cancelling repair:", err);
+      window.alert(err.response?.data?.message || "Failed to cancel repair request.");
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   const filterCounts = useMemo(() => {
     const counts = { all: repairs.length, pending: 0, "in-progress": 0, completed: 0 };
@@ -186,12 +208,24 @@ export default function MyRepairsPage() {
                         <span className="text-xs font-mono text-neutral-500">
                           Requested {formatDate(repair.request_date)}
                         </span>
-                        <Link
-                          to={action.to}
-                          className="text-sm font-semibold underline underline-offset-2 hover:text-amber-600 transition-colors duration-150"
-                        >
-                          {action.label}
-                        </Link>
+                        <div className="flex items-center gap-3">
+                          <Link
+                            to={action.to}
+                            className="text-sm font-semibold underline underline-offset-2 hover:text-amber-600 transition-colors duration-150"
+                          >
+                            {action.label}
+                          </Link>
+                          {action.secondary && (
+                            <button
+                              type="button"
+                              disabled={cancellingId === repair.repair_id}
+                              onClick={() => handleCancel(repair.repair_id)}
+                              className="text-sm font-semibold text-neutral-400 underline underline-offset-2 hover:text-red-500 transition-colors duration-150 disabled:opacity-50"
+                            >
+                              {cancellingId === repair.repair_id ? "Cancelling..." : action.secondary}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -240,13 +274,11 @@ export default function MyRepairsPage() {
                               {action.secondary && (
                                 <button
                                   type="button"
-                                  className="font-semibold text-neutral-400 underline underline-offset-2 hover:text-red-500 transition-colors duration-150"
-                                  onClick={() => {
-                                    // TODO: wire up cancel (e.g. repairAPI.updateStatus(repair.repair_id, 'Cancelled'))
-                                    window.alert(`Cancel repair ${repair.repair_id}`);
-                                  }}
+                                  disabled={cancellingId === repair.repair_id}
+                                  className="font-semibold text-neutral-400 underline underline-offset-2 hover:text-red-500 transition-colors duration-150 disabled:opacity-50"
+                                  onClick={() => handleCancel(repair.repair_id)}
                                 >
-                                  {action.secondary}
+                                  {cancellingId === repair.repair_id ? "Cancelling..." : action.secondary}
                                 </button>
                               )}
                             </div>

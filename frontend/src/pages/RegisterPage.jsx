@@ -10,7 +10,6 @@ const ROLES = [
   { value: "customer", label: "Customer" },
   { value: "retailer", label: "Retailer" },
   { value: "technician", label: "Technician" },
-  { value: "admin", label: "Admin" },
 ];
 
 export default function RegisterPage() {

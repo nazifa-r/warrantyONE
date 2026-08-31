@@ -6,12 +6,7 @@ import Input from "../components/ui/Input";
 import RoleTabs from "../components/ui/RoleTabs";
 import { useAuth } from "../context/AuthContext";
 
-const ROLES = [
-  { value: "customer", label: "Customer" },
-  { value: "retailer", label: "Retailer" },
-  { value: "technician", label: "Technician" },
-  { value: "admin", label: "Admin" },
-];
+
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -180,12 +175,6 @@ export default function LoginPage() {
             autoComplete="off"
             noValidate
           >
-            <div>
-              <span className="block text-sm font-semibold text-neutral-900 mb-2">
-                I am a
-              </span>
-              <RoleTabs roles={ROLES} value={role} onChange={setRole} />
-            </div>
 
             <div className="space-y-1">
               <label htmlFor="email" className="block text-sm font-semibold text-neutral-900">
