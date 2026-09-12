@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create axios instance with base URL
 const API = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5001/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -45,8 +45,11 @@ export const authAPI = {
 };
 
 // Products API calls
+// Note: the backend scopes GET /products to the logged-in customer
+// automatically (from the JWT), so the customerId argument here is
+// optional — kept for API compatibility with existing page code.
 export const productAPI = {
-  getAll: () => API.get('/products'),
+  getAll: (customerId) => API.get('/products', { params: customerId ? { customer_id: customerId } : {} }),
   getById: (id) => API.get(`/products/${id}`),
   getBySerial: (serial) => API.get(`/products/serial/${serial}`),
   create: (data) => API.post('/products', data),
@@ -73,6 +76,28 @@ export const warrantyAPI = {
   createPlan: (data) => API.post('/warranties/plans', data),
   updatePlan: (id, data) => API.put(`/warranties/plans/${id}`, data),
   deletePlan: (id) => API.delete(`/warranties/plans/${id}`),
+};
+
+// Repairs API calls
+export const repairAPI = {
+  getAll: () => API.get('/repairs'),
+  getById: (id) => API.get(`/repairs/${id}`),
+  create: (data) => API.post('/repairs', data),
+  update: (id, data) => API.put(`/repairs/${id}`, data),
+  cancel: (id) => API.put(`/repairs/${id}/cancel`),
+  updateStatus: (id, status) => API.put(`/repairs/${id}/status`, { status }),
+};
+
+// Analytics API calls (Admin/Retailer only)
+export const analyticsAPI = {
+  getProductOwnership: () => API.get('/analytics/product-ownership'),
+  getCustomerProductCounts: () => API.get('/analytics/customer-product-counts'),
+  getAttentionNeeded: () => API.get('/analytics/attention-needed'),
+  getEngagedPremiumCustomers: () => API.get('/analytics/engaged-premium-customers'),
+  getTroubleFreeProducts: () => API.get('/analytics/trouble-free-products'),
+  getCategorySummary: () => API.get('/analytics/category-summary'),
+  getHighValueCustomers: () => API.get('/analytics/high-value-customers'),
+  getAboveAverageProducts: () => API.get('/analytics/above-average-products'),
 };
 
 export default API;

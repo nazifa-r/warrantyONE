@@ -1,62 +1,48 @@
 const jwt = require('jsonwebtoken');
-const { query } = require('../config/db');
-const { sendError } = require('../utils/responseHandler');
+const pool = require('../config/db');
 
+// Verifies the Bearer token the frontend's axios interceptor attaches,
+// and loads the current user (with customer_id if role = Customer)
+// onto req.user. On failure, sends 401 — the frontend's response
+// interceptor already handles 401 by clearing localStorage and
+// redirecting to /login.
 const protect = async (req, res, next) => {
-  let token;
-  
-  // Check for token in headers
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    token = req.headers.authorization.split(' ')[1];
-  }
-  
-  if (!token) {
-    return sendError(res, 'Not authorized, no token', 401);
-  }
-  
   try {
-    // Verify token
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, message: 'Not authorized, no token' });
+    }
+
+    const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Get user from database
-    const users = await query(
-      'SELECT user_id, full_name, email, phone, role FROM Users WHERE user_id = ?',
+
+    const [rows] = await pool.execute(
+      `SELECT u.user_id, u.full_name, u.email, u.phone, u.role, u.created_at,
+              c.customer_id
+       FROM users u
+       LEFT JOIN customers c ON c.user_id = u.user_id
+       WHERE u.user_id = ?`,
       [decoded.user_id]
     );
-    
-    if (!users || users.length === 0) {
-      return sendError(res, 'User not found', 401);
+
+    if (rows.length === 0) {
+      return res.status(401).json({ success: false, message: 'User no longer exists' });
     }
-    
-    req.user = users[0];
+
+    req.user = rows[0];
     next();
-  } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
-      return sendError(res, 'Invalid token', 401);
-    }
-    if (error.name === 'TokenExpiredError') {
-      return sendError(res, 'Token expired', 401);
-    }
-    return sendError(res, 'Not authorized', 401);
+  } catch (err) {
+    return res.status(401).json({ success: false, message: 'Not authorized, token failed' });
   }
 };
 
-// Role-based authorization
-const authorize = (...roles) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return sendError(res, 'Not authorized', 401);
-    }
-    
-    if (!roles.includes(req.user.role)) {
-      return sendError(res, `Role ${req.user.role} is not authorized to access this resource`, 403);
-    }
-    
-    next();
-  };
+// Restrict a route to specific roles, e.g. authorize('Admin', 'Retailer')
+const authorize = (...roles) => (req, res, next) => {
+  if (!req.user || !roles.map(r => r.toLowerCase()).includes(req.user.role.toLowerCase())) {
+    return res.status(403).json({ success: false, message: 'Not authorized for this action' });
+  }
+  next();
 };
 
-module.exports = {
-  protect,
-  authorize
-};
+module.exports = { protect, authorize };

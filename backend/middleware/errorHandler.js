@@ -1,31 +1,41 @@
-const { sendError } = require('../utils/responseHandler');
-
+// Centralized error handler — keeps every response in the
+// { success: false, message } shape the frontend expects.
 const errorHandler = (err, req, res, next) => {
-  console.error('Error:', err.stack);
-  
-  // Default error
-  let statusCode = err.statusCode || 500;
-  let message = err.message || 'Internal Server Error';
-  
-  // Handle specific errors
+  console.error(err.stack);
+
+  // MySQL duplicate entry (unique constraint violation)
   if (err.code === 'ER_DUP_ENTRY') {
-    statusCode = 409;
-    message = 'Duplicate entry found';
+    return res.status(409).json({
+      success: false,
+      message: 'A record with that value already exists.',
+    });
   }
-  
-  if (err.code === 'ER_NO_REFERENCED_ROW_2') {
-    statusCode = 400;
-    message = 'Invalid foreign key reference';
+
+  // MySQL foreign key constraint failures
+  if (err.code === 'ER_NO_REFERENCED_ROW' || err.code === 'ER_NO_REFERENCED_ROW_2' || err.code === 'ER_ROW_IS_REFERENCED_2') {
+    return res.status(400).json({
+      success: false,
+      message: 'Related record not found (invalid reference).',
+    });
   }
-  
-  if (err.name === 'ValidationError') {
-    statusCode = 400;
-    message = err.message;
+
+  // MySQL CHECK constraint failures (MySQL 8.0.16+)
+  if (err.code === 'ER_CHECK_CONSTRAINT_VIOLATED') {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid value for one of the fields provided.',
+    });
   }
-  
-  return sendError(res, message, statusCode);
+
+  const statusCode = err.statusCode || 500;
+  res.status(statusCode).json({
+    success: false,
+    message: err.message || 'Server error',
+  });
 };
 
-module.exports = {
-  errorHandler
+const notFound = (req, res) => {
+  res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
 };
+
+module.exports = { errorHandler, notFound };
